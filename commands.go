@@ -87,7 +87,7 @@ func handlerRegister(s *state, cmd command) error {
 	return nil
 }
 
-func handlerResest(s *state, cmd command) error {
+func handlerReset(s *state, cmd command) error {
 	if err := s.Database.DeleteAllUsers(context.Background()); err != nil {
 		return fmt.Errorf("failed to reset users: %w", err)
 	}
@@ -106,6 +106,67 @@ func handlerUsers(s *state, cmd command) error {
 		} else {
 			fmt.Printf("* %s\n", user.Name)
 		}
+	}
+	return nil
+}
+
+func handlerAgg(s *state, cmd command) error {
+	feed, err := fetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
+	if err != nil {
+		return fmt.Errorf("failed to fetch feed: %w", err)
+	}
+
+	for _, item := range feed.Channel.Item {
+		fmt.Printf("Title: %s\nLink: %s\nDescription: %s\nPubDate: %s\n\n", item.Title, item.Link, item.Description, item.PubDate)
+	}
+
+	return nil
+}
+
+func handlerAddfeed(s *state, cmd command) error {
+	currentName := s.Config.CurrentUserName
+	if currentName == "" {
+		return fmt.Errorf("no user is currently logged in")
+	}
+
+	user, err := s.Database.GetUser(context.Background(), currentName)
+	if err != nil {
+		return fmt.Errorf("failed to get current user: %w", err)
+	}
+
+	if len(cmd.Args) != 2 {
+		os.Exit(1)
+	}
+
+	name := cmd.Args[0]
+	url := cmd.Args[1]
+
+	params := database.CreateFeedParams{
+		ID:		uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Name:      name,
+		Url:       url,
+		UserID:    user.ID,
+	}
+
+	feed, err := s.Database.CreateFeed(context.Background(), params)
+	if err != nil {
+		return fmt.Errorf("failed to create feed: %w", err)
+	}
+
+	fmt.Printf("Feed fields: \nID: %s\nCreatedAt: %s\nUpdatedAt: %s\nName: %s\nUrl: %s\nUserID: %s\n", feed.ID, feed.CreatedAt, feed.UpdatedAt, feed.Name, feed.Url, feed.UserID)
+	return nil
+}
+
+func handlerFeeds(s *state, cmd command) error {
+	feeds, err := s.Database.GetAllFeeds(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to get feeds: %w", err)
+	}
+
+	for _, feed := range feeds {
+		fmt.Printf("Name: %s\nUrl: %s\nUser: %s\n\n", feed.Name, feed.Url, feed.Name_2)
 	}
 	return nil
 }
